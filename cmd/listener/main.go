@@ -49,6 +49,33 @@ func main() {
 		}
 
 		slog.Info("received notification", "channel", notification.Channel, "payload", notification.Payload)
+
+		stmt := `BEGIN;
+
+            SELECT id, data, created_at
+            FROM messages
+            ORDER BY created_at
+            FOR UPDATE SKIP LOCKED
+            LIMIT 1;
+
+            DELETE FROM messages
+            WHERE id IN (
+                SELECT id
+                FROM messages
+                ORDER BY created_at
+                FOR UPDATE SKIP LOCKED
+                LIMIT 1
+            );
+
+            COMMIT;`
+
+		_, err = conn.Exec(context.Background(), stmt)
+		if err != nil {
+			slog.Error("unable to process message", "error", err)
+			continue
+		}
+
+		slog.Info("processed message")
 	}
 }
 
