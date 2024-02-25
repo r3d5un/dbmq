@@ -13,7 +13,8 @@ WHERE id IN (
     ORDER BY created_at
     FOR UPDATE SKIP LOCKED
     LIMIT 1
-);
+)
+RETURNING id, data, created_at;
 
 COMMIT;
 
