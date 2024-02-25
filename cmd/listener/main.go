@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"os"
 
-	// "github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -77,15 +75,4 @@ func main() {
 
 		slog.Info("processed message")
 	}
-}
-
-func openDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		return nil, err
-	}
-	if err = db.Ping(); err != nil {
-		return nil, err
-	}
-	return db, nil
 }
