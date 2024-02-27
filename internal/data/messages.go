@@ -117,6 +117,7 @@ func (m MessageModel) Notify(pool *pgxpool.Pool) error {
 		slog.Error("unable to acquire connection", "error", err)
 		return err
 	}
+	defer conn.Release()
 
 	_, err = conn.Exec(context.Background(), "NOTIFY message_channel, 'New message';")
 	if err != nil {
