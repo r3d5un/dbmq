@@ -92,8 +92,22 @@ func (m MessageModel) GetNext(tx pgx.Tx) (*Message, error) {
 	return &msg, nil
 }
 
-func (m MessageModel) Delete(tx *pgx.Tx, id int64) error {
-	slog.Error("not implemented")
+func (m MessageModel) Dequeue(tx pgx.Tx, id int64) error {
+	stmt := `DELETE FROM messages
+        WHERE id IN (
+            SELECT id
+            FROM messages
+            ORDER BY created_at
+            FOR UPDATE SKIP LOCKED
+            LIMIT 1
+        );`
+
+	_, err := tx.Exec(context.Background(), stmt)
+	if err != nil {
+		slog.Error("unable to execute statement", "error", err)
+		return err
+	}
+
 	return nil
 }
 
