@@ -96,3 +96,19 @@ func (m MessageModel) Delete(tx *pgx.Tx, id int64) error {
 	slog.Error("not implemented")
 	return nil
 }
+
+func (m MessageModel) Notify(pool *pgxpool.Pool) error {
+	conn, err := pool.Acquire(context.Background())
+	if err != nil {
+		slog.Error("unable to acquire connection", "error", err)
+		return err
+	}
+
+	_, err = conn.Exec(context.Background(), "NOTIFY message_channel, 'New message';")
+	if err != nil {
+		slog.Error("unable to execute notification statement", "error", err)
+		return err
+	}
+
+	return nil
+}
