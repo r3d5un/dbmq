@@ -25,8 +25,36 @@ type MessageModel struct {
 }
 
 func (m MessageModel) Insert(tx pgx.Tx, data Data) (*Message, error) {
-	slog.Error("not implemented")
-	return nil, nil
+	stmt := `INSERT INTO messages (data)
+        VALUES ($1)
+        RETURNING id, data, created_at;`
+
+	dataJSON, err := json.Marshal(data)
+	if err != nil {
+		slog.Error("unable to marshal data", "error", err)
+		return nil, err
+	}
+
+	var msg Message
+	var rawData []byte
+
+	err = tx.QueryRow(context.Background(), stmt, dataJSON).Scan(
+		&msg.ID,
+		&rawData,
+		&msg.CreatedAt,
+	)
+	if err != nil {
+		slog.Error("unable to execute statement", "error", err)
+		return nil, err
+	}
+
+	err = json.Unmarshal(rawData, &msg.Data)
+	if err != nil {
+		slog.Error("unable to unmarshal data", "error", err)
+		return nil, err
+	}
+
+	return &msg, nil
 }
 
 func (m MessageModel) GetNext(tx pgx.Tx) (*Message, error) {
