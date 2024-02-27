@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -126,4 +127,27 @@ func (m MessageModel) Notify(pool *pgxpool.Pool) error {
 	}
 
 	return nil
+}
+
+func (m MessageModel) Listen(pool *pgxpool.Pool, ch chan pgconn.Notification) {
+	conn, err := pool.Acquire(context.Background())
+	if err != nil {
+		slog.Error("unable to acquire connection", "error", err)
+		return
+	}
+	defer conn.Release()
+
+	_, err = conn.Exec(context.Background(), "LISTEN message_channel;")
+	if err != nil {
+		slog.Error("unable to listen", "error", err)
+		return
+	}
+
+	notification, err := conn.Conn().WaitForNotification(context.Background())
+	if err != nil {
+		slog.Error("unable to receive notification", "error", err)
+		return
+	}
+
+	ch <- *notification
 }
