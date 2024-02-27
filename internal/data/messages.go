@@ -25,7 +25,7 @@ type MessageModel struct {
 	Pool *pgxpool.Pool
 }
 
-func (m MessageModel) Insert(tx pgx.Tx, data Data) (*Message, error) {
+func (m MessageModel) NewMessage(tx pgx.Tx, data Data) (*Message, error) {
 	stmt := `INSERT INTO messages (data)
         VALUES ($1)
         RETURNING id, data, created_at;`
