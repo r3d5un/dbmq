@@ -129,25 +129,31 @@ func (m MessageModel) Notify(pool *pgxpool.Pool) error {
 	return nil
 }
 
-func (m MessageModel) Listen(pool *pgxpool.Pool, ch chan pgconn.Notification) {
-	conn, err := pool.Acquire(context.Background())
-	if err != nil {
-		slog.Error("unable to acquire connection", "error", err)
-		return
-	}
-	defer conn.Release()
+func (m MessageModel) Listen(pool *pgxpool.Pool, ch chan<- pgconn.Notification) {
+	for {
+		conn, err := pool.Acquire(context.Background())
+		if err != nil {
+			slog.Error("unable to acquire connection", "error", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
 
-	_, err = conn.Exec(context.Background(), "LISTEN message_channel;")
-	if err != nil {
-		slog.Error("unable to listen", "error", err)
-		return
-	}
+		_, err = conn.Exec(context.Background(), "LISTEN message_channel;")
+		if err != nil {
+			slog.Error("unable to listen", "error", err)
+			conn.Release()
+			continue
+		}
 
-	notification, err := conn.Conn().WaitForNotification(context.Background())
-	if err != nil {
-		slog.Error("unable to receive notification", "error", err)
-		return
-	}
+		for {
+			notification, err := conn.Conn().WaitForNotification(context.Background())
+			if err != nil {
+				slog.Error("unable to receive notification", "error", err)
+				break
+			}
+			ch <- *notification
+		}
 
-	ch <- *notification
+		conn.Release()
+	}
 }
