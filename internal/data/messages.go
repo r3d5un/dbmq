@@ -25,7 +25,7 @@ type MessageModel struct {
 	Pool *pgxpool.Pool
 }
 
-func (m MessageModel) NewMessage(tx pgx.Tx, data Data) (*Message, error) {
+func (m MessageModel) NewMessage(data Data) (*Message, error) {
 	stmt := `INSERT INTO messages (data)
         VALUES ($1)
         RETURNING id, data, created_at;`
@@ -39,7 +39,7 @@ func (m MessageModel) NewMessage(tx pgx.Tx, data Data) (*Message, error) {
 	var msg Message
 	var rawData []byte
 
-	err = tx.QueryRow(context.Background(), stmt, dataJSON).Scan(
+	err = m.Pool.QueryRow(context.Background(), stmt, dataJSON).Scan(
 		&msg.ID,
 		&rawData,
 		&msg.CreatedAt,
