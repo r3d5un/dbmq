@@ -13,6 +13,9 @@ import (
 )
 
 func main() {
+	handler := slog.NewJSONHandler(os.Stdout, nil)
+	slog.SetDefault(slog.New(handler))
+
 	slog.Info("starting listener...")
 
 	config, err := pgxpool.ParseConfig("postgresql://postgres:postgres@localhost:5432?database=dbmq")
