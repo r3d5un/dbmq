@@ -34,8 +34,8 @@ func main() {
 	slog.Info("connection pool established")
 
 	slog.Info("opening channels...")
-	notificationChannel := make(chan pgconn.Notification)
-	messageChannel := make(chan data.Message)
+	notificationChannel := make(chan pgconn.Notification, 10)
+	messageChannel := make(chan data.Message, 10)
 	done := make(chan bool)
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
