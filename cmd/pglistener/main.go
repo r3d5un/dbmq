@@ -47,19 +47,8 @@ func main() {
 	go models.Messages.Listen(notificationChannel, done)
 
 	go func() {
-		select {
-		case <-done:
-			slog.Info("stopping listener")
-			return
-		case <-signals:
-			slog.Info("stopping listener")
-			done <- true
-			return
-		case <-messageChannel:
-			slog.Info("processing message")
-			for m := range messageChannel {
-				slog.Info("message processed", "id", m.ID, "data", m.Data, "created_at", m.CreatedAt)
-			}
+		for m := range messageChannel {
+			slog.Info("message processed", "id", m.ID, "data", m.Data, "created_at", m.CreatedAt)
 		}
 	}()
 
