@@ -112,8 +112,8 @@ func (m MessageModel) Dequeue(tx pgx.Tx, id int64) error {
 	return nil
 }
 
-func (m MessageModel) Notify(pool *pgxpool.Pool) error {
-	conn, err := pool.Acquire(context.Background())
+func (m MessageModel) Notify() error {
+	conn, err := m.Pool.Acquire(context.Background())
 	if err != nil {
 		slog.Error("unable to acquire connection", "error", err)
 		return err
