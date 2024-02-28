@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/r3d5un/dbmq/internal/data"
@@ -95,75 +93,4 @@ func main() {
 	<-done
 	slog.Info("stopping listening process")
 	os.Exit(0)
-}
-
-func consumeMessages(conn *pgxpool.Conn) error {
-	newMessage := true
-
-	stmt := `SELECT id, data, created_at
-FROM messages
-ORDER BY created_at
-FOR UPDATE SKIP LOCKED
-LIMIT 1;`
-
-	delStmt := `DELETE FROM messages
-WHERE id IN (
-    SELECT id
-    FROM messages
-    ORDER BY created_at
-    FOR UPDATE SKIP LOCKED
-    LIMIT 1
-);`
-
-	slog.Info("looping through messages...")
-	for newMessage {
-		slog.Info("processing message...")
-
-		slog.Info("beginning transaction...")
-		tx, err := conn.Begin(context.Background())
-		if err != nil {
-			slog.Error("unable to begin transaction", "error", err)
-			return err
-		}
-
-		slog.Info("executing SELECT statement...")
-		res, err := tx.Exec(context.Background(), stmt)
-		if err != nil {
-			switch err {
-			case sql.ErrNoRows:
-				slog.Info("no new messages", "error", err)
-				newMessage = false
-				break
-			case pgx.ErrNoRows:
-				slog.Info("no new messages", "error", err)
-				newMessage = false
-				break
-			default:
-				slog.Error("unable to execute statement", "error", err)
-				break
-			}
-		}
-		slog.Info("select query executed", "rows_affected", res.RowsAffected())
-		if res.RowsAffected() == 0 {
-			newMessage = false
-			return nil
-		}
-
-		slog.Info("executing DELETE statement...")
-		_, err = tx.Exec(context.Background(), delStmt)
-		if err != nil {
-			slog.Error("unable to execute statement", "error", err)
-			tx.Rollback(context.Background())
-			continue
-		}
-
-		slog.Info("processed message")
-		err = tx.Commit(context.Background())
-		if err != nil {
-			slog.Error("unable to commit transaction", "error", err)
-			return err
-		}
-	}
-
-	return nil
 }
