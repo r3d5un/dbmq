@@ -3,4 +3,4 @@ VALUES (
     '{"message": "Hello, world!"}'
 );
 
-NOTIFY dbmq_channel, 'New message available';
+NOTIFY message_channel, 'New message';
