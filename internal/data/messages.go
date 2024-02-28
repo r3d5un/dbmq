@@ -77,7 +77,7 @@ func (m MessageModel) GetNext(tx pgx.Tx) (*Message, error) {
 		switch err {
 		case pgx.ErrNoRows:
 			slog.Info("no new messages", "error", err)
-			return nil, nil
+			return nil, err
 		default:
 			slog.Error("unable to execute statement", "error", err)
 			return nil, err
@@ -107,6 +107,57 @@ func (m MessageModel) Dequeue(tx pgx.Tx, id int64) error {
 	if err != nil {
 		slog.Error("unable to execute statement", "error", err)
 		return err
+	}
+
+	return nil
+}
+
+func (m MessageModel) ConsumeAll(ch chan<- Message) error {
+	tx, err := m.Pool.Begin(context.Background())
+	if err != nil {
+		slog.Error("unable to begin transaction", "error", err)
+		return err
+	}
+	defer tx.Rollback(context.Background())
+
+	for {
+		tx, err = m.Pool.Begin(context.Background())
+
+		slog.Info("getting next message...")
+		msg, err := m.GetNext(tx)
+		if err != nil {
+			switch err {
+			case pgx.ErrNoRows:
+				slog.Error("no rows found", "error", err)
+				return err
+			default:
+				slog.Error("unable to get next message", "error", err)
+				return err
+			}
+		}
+
+		if msg == nil {
+			slog.Info("no new messages")
+			break
+		}
+
+		slog.Info("processing message...")
+		ch <- *msg
+
+		slog.Info("dequeuing message...")
+		err = m.Dequeue(tx, *msg.ID)
+		if err != nil {
+			slog.Error("unable to dequeue message", "error", err)
+			tx.Rollback(context.Background())
+			return err
+		}
+
+		slog.Info("committing transaction...")
+		err = tx.Commit(context.Background())
+		if err != nil {
+			slog.Error("unable to commit transaction", "error", err)
+			return err
+		}
 	}
 
 	return nil
