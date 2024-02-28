@@ -113,15 +113,19 @@ func (m MessageModel) Dequeue(tx pgx.Tx, id int64) error {
 }
 
 func (m MessageModel) ConsumeAll(ch chan<- Message) error {
-	tx, err := m.Pool.Begin(context.Background())
-	if err != nil {
-		slog.Error("unable to begin transaction", "error", err)
-		return err
-	}
-	defer tx.Rollback(context.Background())
-
 	for {
-		tx, err = m.Pool.Begin(context.Background())
+		tx, err := m.Pool.Begin(context.Background())
+		if err != nil {
+			slog.Error("unable to begin transaction", "error", err)
+			return err
+		}
+
+		var commitSuccessful bool
+		defer func() {
+			if !commitSuccessful {
+				tx.Rollback(context.Background())
+			}
+		}()
 
 		slog.Info("getting next message...")
 		msg, err := m.GetNext(tx)
@@ -142,7 +146,14 @@ func (m MessageModel) ConsumeAll(ch chan<- Message) error {
 		}
 
 		slog.Info("processing message...")
-		ch <- *msg
+		select {
+		case ch <- *msg:
+			slog.Info("message sent to channel")
+		default:
+			slog.Error("channel full, message not sent")
+			time.Sleep(5 * time.Second)
+			continue
+		}
 
 		slog.Info("dequeuing message...")
 		err = m.Dequeue(tx, *msg.ID)
@@ -158,6 +169,7 @@ func (m MessageModel) ConsumeAll(ch chan<- Message) error {
 			slog.Error("unable to commit transaction", "error", err)
 			return err
 		}
+		commitSuccessful = true
 	}
 
 	return nil
@@ -209,7 +221,17 @@ func (m MessageModel) Listen(ch chan<- pgconn.Notification, done <-chan bool) {
 					break
 				} else {
 					slog.Info("received notification")
-					ch <- *notification
+					select {
+					case ch <- *notification:
+						slog.Info("notification sent to channel")
+					case <-done:
+						slog.Info("received done signal, stopping listener.")
+						return
+					default:
+						slog.Error("channel full, notification not sent")
+						time.Sleep(5 * time.Second)
+						return
+					}
 				}
 			}
 		}
