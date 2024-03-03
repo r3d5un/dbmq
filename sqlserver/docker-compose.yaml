@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  dbmq-mssql:
+    container_name: "dbmq-mssql"
+    user: root
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    ports:
+      - "1433:1433"
+    environment:
+      SA_PASSWORD: "oPax9HFmjU4AV^AqXEeA"
+      ACCEPT_EULA: "Y"
+    volumes:
+      - ./data:/var/opt/mssql/data
