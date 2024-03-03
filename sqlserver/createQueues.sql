@@ -1,2 +1,11 @@
-CREATE QUEUE dbo.RequestQueue;
-CREATE QUEUE dbo.ResponseQueue;
+CREATE QUEUE dbo.RequestQueue
+WITH 
+    STATUS=ON
+    --, RETENTION=ON;
+GO
+
+CREATE QUEUE dbo.ResponseQueue
+WITH 
+    STATUS=ON
+    --, RETENTION=ON;
+GO
