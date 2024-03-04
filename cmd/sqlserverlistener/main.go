@@ -28,6 +28,47 @@ func main() {
 	slog.Info("database connection pool established")
 }
 
+func sendMessage(db *sql.DB, message string) (rowsAffected *int64, err error) {
+	tx, err := db.Begin()
+	if err != nil {
+		slog.Error("error occurred while starting transaction", "error", err)
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	res, err := db.Exec(`
+        BEGIN DIALOG @conversation_handle
+        FROM SERVICE [RequestService]
+        TO SERVICE 'ResponseService'
+        ON CONTRACT [ProcessingContract]
+        WITH ENCRYPTION = OFF;
+
+        SET @message = N'Hello, World!';
+
+        SEND ON CONVERSATION @conversation_handle
+        MESSAGE TYPE [RequestMessage] (@p1);`,
+		message,
+	)
+	if err != nil {
+		slog.Error("error occurred while sending message", "error", err)
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		slog.Error("error occurred while committing transaction", "error", err)
+		return nil, err
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		slog.Error("error occurred while getting rows affected", "error", err)
+		return nil, err
+	}
+
+	return &affected, nil
+}
+
 func openDB(dsn string) (*sql.DB, error) {
 	db, err := sql.Open("sqlserver", dsn)
 	if err != nil {
