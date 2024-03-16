@@ -69,6 +69,47 @@ func sendMessage(db *sql.DB, message string) (rowsAffected *int64, err error) {
 	return &affected, nil
 }
 
+type IncomingMessage struct {
+	ConversationHandle string `json:"conversation_handle"`
+	TypeName           string `json:"type_name"`
+	Body               string `json:"body"`
+}
+
+func receiveMessage(db *sql.DB) (msg *IncomingMessage, err error) {
+	tx, err := db.Begin()
+	if err != nil {
+		slog.Error("error occurred while starting transaction", "error", err)
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	err = db.QueryRow(`
+		RECEIVE TOP(1)
+			@conversation_handle = conversation_handle,
+			@message_type_name = message_type_name,
+			@message_body = message_body
+		FROM dbo.RequestQueue;
+
+		SELECT @conversation_handle, @message_type_name, @message_body
+
+		IF (@message_type_name = 'RequestMessage')
+			BEGIN
+				SET @response_message = N'Foo';
+				SEND ON CONVERSATION @conversation_handle MESSAGE TYPE [ResponseMessage] (@response_message);
+				END CONVERSATION  @conversation_handle;
+			END
+	`).Scan(
+		&msg.ConversationHandle,
+		&msg.TypeName,
+		&msg.Body,
+	)
+	if err != nil {
+		slog.Error("unable to get message from message broker", "error", err)
+		return nil, err
+	}
+
+	return msg, err
+}
 func openDB(dsn string) (*sql.DB, error) {
 	db, err := sql.Open("sqlserver", dsn)
 	if err != nil {
